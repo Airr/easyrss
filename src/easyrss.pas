@@ -12,7 +12,7 @@ unit EasyRSS;
 interface
 
 uses
-  DOM, XmlRead, FGL, HTTPDefs, HTTPSend, Classes, SysUtils;
+  DOM, XmlRead, FGL, HTTPDefs, FPHttpClient, Classes, SysUtils;
 
 type
 
@@ -140,6 +140,12 @@ function NewGuid: string;
 
 implementation
 
+type
+  THttp = class(TFPHTTPClient)
+  public
+    procedure GetFeed(const AUrl: string; out AFeed: TStream);
+  end;
+
 function DateTimeToGMT(const ADateTime: TDateTime): string;
 var
   VYear, VMonth, VDay, VHour, VMinute, VSecond, M: Word;
@@ -160,6 +166,14 @@ begin
   StrLFmt(PChar(Result), 36,'%.8x-%.4x-%.4x-%.2x%.2x-%.2x%.2x%.2x%.2x%.2x%.2x',
     [VGuid.D1, VGuid.D2, VGuid.D3, VGuid.D4[0], VGuid.D4[1], VGuid.D4[2],
      VGuid.D4[3], VGuid.D4[4], VGuid.D4[5], VGuid.D4[6], VGuid.D4[7]]);
+end;
+
+{ THttp }
+
+procedure THttp.GetFeed(const AUrl: string; out AFeed: TStream);
+begin
+  AFeed := TMemoryStream.Create;
+  DoMethod('GET', AUrl, AFeed, [200]);
 end;
 
 { TRSSImage }
@@ -408,13 +422,16 @@ end;
 
 procedure TRSSReader.LoadFromHttp(const AUrl: string);
 var
-  VHttp: THTTPSend;
+  VHttp: THttp;
+  VFeed: TStream;
 begin
-  VHttp := THTTPSend.Create;
+  VHttp := THttp.Create(nil);
   try
-    VHttp.HTTPMethod('GET', AUrl);
-    LoadFromStream(VHttp.Document);
+    VHttp.GetFeed(AUrl, VFeed);
+    VFeed.Position := 0;
+    LoadFromStream(VFeed);
   finally
+    FreeAndNil(VFeed);
     VHttp.Free;
   end;
 end;
